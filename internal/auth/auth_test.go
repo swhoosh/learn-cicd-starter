@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"net/http"
 	"reflect"
 	"testing"
@@ -8,36 +9,41 @@ import (
 
 func TestGetAPIKey(t *testing.T) {
 	tests := []struct {
-		name    string
-		headers http.Header
-		want    string
-		wantErr bool
+		name      string
+		headers   http.Header
+		want      string
+		wantErr   bool
+		wantErrIs error
 	}{
 		{
-			name:    "ok - valid APIKey header",
-			headers: http.Header{"Authorization": []string{"ApiKey a12345"}},
-			want:    "a12345",
-			wantErr: false,
+			name:      "ok - valid APIKey header",
+			headers:   http.Header{"Authorization": []string{"ApiKey a12345"}},
+			want:      "a12345",
+			wantErr:   false,
+			wantErrIs: nil,
 		},
 		{
-			name:    "ok - not Authorization header",
-			headers: http.Header{"X-API-Key": []string{"a12345"}},
-			want:    "",
-			wantErr: true,
+			name:      "ok - not Authorization header",
+			headers:   http.Header{"X-API-Key": []string{"ApiKey a12345"}},
+			want:      "",
+			wantErr:   true,
+			wantErrIs: ErrNoAuthHeaderIncluded,
 		},
 		{
-			name:    "err - wrong APIKey header",
-			headers: http.Header{"Authorization": []string{"Bearer a12345"}},
-			want:    "",
-			wantErr: true,
+			name:      "err - wrong APIKey header",
+			headers:   http.Header{"Authorization": []string{"Bearer a12345"}},
+			want:      "",
+			wantErr:   true,
+			wantErrIs: ErrMalformedAuthHeader,
 		},
 		{
-			name: "err - APIKey header malformed",
+			name: "err - APIKey header without value",
 			headers: http.Header{
 				"Authorization": []string{"ApiKey"},
 			},
-			want:    "",
-			wantErr: true,
+			want:      "",
+			wantErr:   true,
+			wantErrIs: ErrMalformedAuthHeader,
 		},
 	}
 
@@ -48,6 +54,10 @@ func TestGetAPIKey(t *testing.T) {
 			if tc.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
+				}
+
+				if !errors.Is(tc.wantErrIs, err) {
+					t.Fatalf("expected error: %v, got: %v", tc.wantErrIs, err)
 				}
 				return
 			}
